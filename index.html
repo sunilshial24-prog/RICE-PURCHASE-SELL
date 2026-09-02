@@ -19,7 +19,17 @@ button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}h1
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:15px;box-shadow:var(--shadow)}.card h3{color:#cfe0ff;font-size:15px;margin-bottom:5px}
 .kpi{min-height:112px;display:flex;flex-direction:column;justify-content:space-between}.kpi.blue{background:linear-gradient(180deg,#0b2545,#0c1a35)}.kpi.green{background:linear-gradient(180deg,#0b2e1c,#0c1a1a)}.kpi.orange{background:linear-gradient(180deg,#3a1c0d,#1a0f0a)}.kpi.purple{background:linear-gradient(180deg,#26113f,#100a20)}.kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}.kpi .val{font-size:1.65rem;font-weight:850}.kpi .sub{font-size:12px;color:var(--muted)}
 .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.quick button{border:1px solid var(--line);background:#0b1730;border-radius:13px;padding:14px 10px;text-align:left}.quick button b{display:block;margin-top:7px}.quick button small{display:block;margin-top:2px}
-.form{display:grid;gap:11px}.row{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:center}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}.field input,.field select,.field textarea,input,select,textarea{background:#0b1730;border:1px solid var(--line);border-radius:10px;padding:10px;width:100%;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(56,189,248,.12)}
+.form{display:grid;gap:11px}.row{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:center}
+.party-picker{position:relative}
+.party-picker input{width:100%}
+.party-suggest{position:absolute;z-index:50;left:0;right:0;top:calc(100% + 4px);background:#0b1730;border:1px solid var(--line2);border-radius:10px;max-height:220px;overflow:auto;box-shadow:var(--shadow);display:none}
+.party-suggest.show{display:block}
+.party-suggest .item{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.party-suggest .item:last-child{border-bottom:0}
+.party-suggest .item:hover{background:#132446}
+.party-suggest .new{color:#7dd3fc}
+.party-status{font-size:12px;margin-top:5px;color:var(--muted)}
+.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}.field input,.field select,.field textarea,input,select,textarea{background:#0b1730;border:1px solid var(--line);border-radius:10px;padding:10px;width:100%;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(56,189,248,.12)}
 .calc{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.calc .box{background:#08122a;border:1px dashed var(--line2);border-radius:12px;padding:11px}.calc .box small{display:block}.calc .box b{font-size:1.25rem;display:block;margin-top:3px}
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:11px}.grow{flex:1}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}.data{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}.data th,.data td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}.data th{background:#0e1a33;color:#cfe0ff;position:sticky;top:0}.data td.num{text-align:right}.pill{display:inline-block;padding:3px 8px;border-radius:999px;border:1px solid var(--line);font-size:11px}.pill.buy{background:#052e1c;color:#bbf7d0;border-color:#166534}.pill.sell{background:#3a1c0d;color:#fed7aa;border-color:#9a3412}.pill.due{background:#3b2b06;color:#fde68a;border-color:#a16207}.pill.paid{background:#052e1c;color:#bbf7d0;border-color:#166534}
 .party-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.party{background:#0b1730;border:1px solid var(--line);border-radius:13px;padding:12px}.party .name{font-weight:750}.party .meta{font-size:12px;color:var(--muted);margin-top:4px}.party .amount{font-size:16px;font-weight:800;margin-top:9px}
@@ -151,16 +161,65 @@ async function refreshAll(){
     toast((lang==="or"?"Google Sheet ସଂଯୋଗ ବିଫଳ: ":"Google Sheet connection failed: ")+e.message);
   }
 }
-function partyOptions(){
-  return `<option value="">${lang==="or"?"ପାର୍ଟି ବାଛନ୍ତୁ":"Select Party"}</option>`+
-    parties.map(p=>`<option value="${esc(partyIdOf(p))}">${esc(partyNameOf(p))}</option>`).join("");
+function partyPicker(type){
+  const sale=type==="sale";
+  const label=sale?(lang==="or"?"ଗ୍ରାହକ / Customer":"Customer / ଗ୍ରାହକ"):(lang==="or"?"ସପ୍ଲାୟର / Supplier":"Supplier / ସପ୍ଲାୟର");
+  return `<div class="party-picker">
+    <input name="partyNameInput" id="partyNameInput" type="text" required autocomplete="off"
+      placeholder="${lang==="or"?"ପାର୍ଟି ନାମ ଲେଖନ୍ତୁ କିମ୍ବା ବାଛନ୍ତୁ":"Type party name or select existing"}">
+    <input type="hidden" name="partyId" id="partyId">
+    <div id="partySuggest" class="party-suggest"></div>
+    <div id="partyStatus" class="party-status">${lang==="or"?"ପୁରୁଣା ପାର୍ଟି ନାମ ଲେଖିଲେ ତାଲିକା ଦେଖାଯିବ। ନୂଆ ନାମ ହେଲେ Save କଲେ Party Master ରେ ଯୋଡ଼ାଯିବ।":"Type to search existing parties. A new name will be saved to Party Master when you save the entry."}</div>
+  </div>`;
+}
+function findPartyByName(name){
+  const n=String(name||"").trim().toLowerCase();
+  if(!n) return null;
+  return parties.find(p=>partyNameOf(p).trim().toLowerCase()===n)||null;
+}
+function newPartyId(){
+  return "P-"+Date.now().toString(36).toUpperCase()+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
+}
+function bindPartyPicker(){
+  const input=$("#partyNameInput"), hidden=$("#partyId"), box=$("#partySuggest"), status=$("#partyStatus");
+  if(!input||!box) return;
+  const render=()=>{
+    const q=input.value.trim().toLowerCase();
+    hidden.value="";
+    if(!q){box.classList.remove("show");status.textContent=lang==="or"?"ପୁରୁଣା ପାର୍ଟି ନାମ ଲେଖିଲେ ତାଲିକା ଦେଖାଯିବ।":"Type to search existing parties.";return;}
+    const matches=parties.filter(p=>partyNameOf(p).toLowerCase().includes(q)).slice(0,8);
+    box.innerHTML=matches.map(p=>`<div class="item" data-id="${esc(partyIdOf(p))}" data-name="${esc(partyNameOf(p))}"><b>${esc(partyNameOf(p))}</b><small style="display:block;color:var(--muted)">${esc(partyIdOf(p))}</small></div>`).join("");
+    box.innerHTML += `<div class="item new">＋ ${lang==="or"?"ନୂଆ ପାର୍ଟି ଭାବେ ଯୋଡ଼ନ୍ତୁ":"Add as new party"}: <b>${esc(input.value.trim())}</b></div>`;
+    box.classList.add("show");
+    status.textContent=matches.length
+      ? (lang==="or"?"ତାଲିକାରୁ ପାର୍ଟି ବାଛନ୍ତୁ, କିମ୍ବା ନୂଆ ନାମ ରଖନ୍ତୁ।":"Select an existing party, or keep this name to create a new party.")
+      : (lang==="or"?"ଏହା ନୂଆ ପାର୍ଟି। Save କଲେ Party Master ରେ ଯୋଡ଼ାଯିବ।":"This is a new party. It will be added to Party Master when you save.");
+  };
+  input.addEventListener("input",render);
+  input.addEventListener("focus",render);
+  box.addEventListener("click",ev=>{
+    const item=ev.target.closest(".item"); if(!item)return;
+    const id=item.dataset.id;
+    if(id){
+      input.value=item.dataset.name;
+      hidden.value=id;
+      status.textContent=(lang==="or"?"ପୁରୁଣା ପାର୍ଟି ଚୟନ: ":"Existing party selected: ")+id;
+    }else{
+      hidden.value="";
+      status.textContent=lang==="or"?"ନୂଆ ପାର୍ଟି। Save କଲେ Unique ID ତିଆରି ହେବ।":"New party. A unique ID will be created when saved.";
+    }
+    box.classList.remove("show");
+  });
+  document.addEventListener("click",ev=>{
+    if(!ev.target.closest(".party-picker")) box.classList.remove("show");
+  },{once:false});
 }
 function form(type){
  let sale=type==="sale", title=sale?(lang==="or"?"ବିକ୍ରି ଏଣ୍ଟ୍ରି":"Sales Entry"):(lang==="or"?"କିଣା ଏଣ୍ଟ୍ରି":"Purchase Entry");
  return `<div class="card"><div class="toolbar"><div class="grow"><h2>${title}</h2><small>🍚 NORMAL RICE / ସାଧାରଣ ଚାଉଳ</small></div><span class="badge">${sale?"SELL / ବିକ୍ରି":"BUY / କିଣା"}</span></div>
  <form class="form" onsubmit="saveEntry(event,'${type}')">
  <div class="row"><label>${lang==="or"?"ତାରିଖ / Date":"Date / ତାରିଖ"}</label><input name="date" type="date" required value="${new Date().toISOString().slice(0,10)}"></div>
- <div class="row"><label>${sale?"ଗ୍ରାହକ / Customer":"ସପ୍ଲାୟର / Supplier"}</label><select name="partyId" required>${partyOptions()}</select></div>
+ <div class="row"><label>${sale?"ଗ୍ରାହକ / Customer":"ସପ୍ଲାୟର / Supplier"}</label>${partyPicker(type)}</div>
  <input type="hidden" name="riceId" value="R001"><input type="hidden" name="riceName" value="NORMAL RICE">
  <div class="row"><label>${lang==="or"?"ପରିମାଣ (KG) / Quantity":"Quantity (KG) / ପରିମାଣ"}</label><input id="qty" name="qty" type="number" min="0" step=".01" required placeholder="0.00"></div>
  <div class="row"><label>${lang==="or"?"ଦର / Rate per KG":"Rate per KG / ଦର"}</label><input id="rate" name="rate" type="number" min="0" step=".01" required placeholder="0.00"></div>
@@ -170,12 +229,49 @@ function form(type){
  <div class="actions"><button class="btn primary" type="submit">💾 ${sale?(lang==="or"?"ବିକ୍ରି ସେଭ୍ କରନ୍ତୁ":"Save Sale"):(lang==="or"?"କିଣା ସେଭ୍ କରନ୍ତୁ":"Save Purchase")}</button><button type="button" class="btn" onclick="setPage('history')">🧾 ${lang==="or"?"ହିସାବ ଦେଖନ୍ତୁ":"View History"}</button></div>
  </form></div>`
 }
-function bindCalc(){["qty","rate","paid"].forEach(id=>$("#"+id)?.addEventListener("input",()=>{let t=(+$("#qty").value||0)*(+$("#rate").value||0),p=+$("#paid").value||0;$("#total").textContent=money(t);$("#due").textContent=money(Math.max(0,t-p))}));}
+function bindCalc(){bindPartyPicker();["qty","rate","paid"].forEach(id=>$("#"+id)?.addEventListener("input",()=>{let t=(+$("#qty").value||0)*(+$("#rate").value||0),p=+$("#paid").value||0;$("#total").textContent=money(t);$("#due").textContent=money(Math.max(0,t-p))}));}
 async function saveEntry(e,type){
   e.preventDefault();
   const x=Object.fromEntries(new FormData(e.target));
-  const p=parties.find(z=>String(partyIdOf(z))===String(x.partyId||""));
-  const partyName=partyNameOf(p||{});
+  let p=findPartyByName(x.partyNameInput);
+  let partyId=String(x.partyId||"").trim();
+  let partyName=String(x.partyNameInput||"").trim();
+
+  if(!partyName){
+    toast(lang==="or"?"ପାର୍ଟି ନାମ ଦିଅନ୍ତୁ":"Enter party name");
+    return;
+  }
+
+  // If the user typed an existing name but did not click the suggestion,
+  // automatically use the existing party instead of creating a duplicate.
+  if(!partyId && p){
+    partyId=partyIdOf(p);
+    partyName=partyNameOf(p);
+  }
+
+  // New party: create it first, then use the returned/stable ID for the transaction.
+  if(!partyId){
+    partyId=newPartyId();
+    try{
+      const pj=await post({
+        action:"addParty",
+        partyId:partyId,
+        partyName:partyName,
+        "Party ID":partyId,
+        "Party Name":partyName,
+        type:type==="sale"?"Customer":"Supplier",
+        "Party Type":type==="sale"?"Customer":"Supplier"
+      });
+      const returnedId=pj?.partyId||pj?.data?.partyId||pj?.data?.["Party ID"]||pj?.["Party ID"];
+      if(returnedId) partyId=returnedId;
+      parties.push({"Party ID":partyId,"Party Name":partyName,"Party Type":type==="sale"?"Customer":"Supplier"});
+    }catch(err){
+      console.error(err);
+      toast((lang==="or"?"ନୂଆ ପାର୍ଟି ସେଭ୍ ବିଫଳ: ":"New party could not be saved: ")+err.message);
+      return;
+    }
+  }
+
   const qtyVal=num(x.qty), rateVal=num(x.rate);
   const amount=qtyVal*rateVal;
   const paidVal=type==="sale"?num(x.received):num(x.paid);
@@ -185,44 +281,26 @@ async function saveEntry(e,type){
   const payload = {
     action: type==="sale" ? "addSale" : "addPurchase",
     type: type==="sale" ? "Sale" : "Purchase",
-    date: date,
-    partyId: x.partyId,
-    partyName: partyName,
-    riceId: "R001",
-    riceName: "NORMAL RICE",
-    qty: qtyVal,
-    rate: rateVal,
-    total: amount,
-    paid: type==="sale" ? 0 : paidVal,
-    received: type==="sale" ? paidVal : 0,
-    due: dueVal,
-    paymentMode: x.paymentMode || "Cash",
-    remarks: x.remarks || "",
-    // Exact workbook-style aliases:
-    "Date": date,
-    "Party ID": x.partyId,
-    "Party Name": partyName,
-    "Rice ID": "R001",
-    "Rice Name": "NORMAL RICE",
-    "Qty (KG)": qtyVal,
-    "Rate / KG": rateVal,
-    "Total Amount": amount,
-    "Paid": type==="sale" ? 0 : paidVal,
-    "Received": type==="sale" ? paidVal : 0,
-    "Due": dueVal,
-    "Payment Mode": x.paymentMode || "Cash",
-    "Remarks": x.remarks || ""
+    date: date, partyId: partyId, partyName: partyName,
+    riceId:"R001", riceName:"NORMAL RICE", qty:qtyVal, rate:rateVal,
+    total:amount, paid:type==="sale"?0:paidVal, received:type==="sale"?paidVal:0,
+    due:dueVal, paymentMode:x.paymentMode||"Cash", remarks:x.remarks||"",
+    "Date":date, "Party ID":partyId, "Party Name":partyName,
+    "Rice ID":"R001", "Rice Name":"NORMAL RICE", "Qty (KG)":qtyVal,
+    "Rate / KG":rateVal, "Total Amount":amount,
+    "Paid":type==="sale"?0:paidVal, "Received":type==="sale"?paidVal:0,
+    "Due":dueVal, "Payment Mode":x.paymentMode||"Cash", "Remarks":x.remarks||""
   };
 
   try{
-    const j=await post(payload);
+    await post(payload);
     toast(lang==="or"?"ତଥ୍ୟ ସଫଳତାର ସହିତ ସେଭ୍ ହେଲା":"Entry saved successfully");
     e.target.reset();
     await refreshAll();
     setPage("history");
   }catch(err){
     console.error(err);
-    toast((lang==="or"?"ସେଭ୍ ବିଫଳ: ":"Save failed: ")+err.message);
+    toast((lang==="or"?"ଏଣ୍ଟ୍ରି ସେଭ୍ ବିଫଳ: ":"Entry save failed: ")+err.message);
   }
 }
 function dashboard(){
@@ -238,11 +316,27 @@ function history(){
 }
 function historyRows(rows){if(!rows.length)return `<tr><td colspan="9" class="empty">No transactions / କୌଣସି ତଥ୍ୟ ନାହିଁ</td></tr>`;return rows.slice().reverse().map(x=>{let type=x.__type||x.Type||"",party=partyNameOf(x),date=x.date||x.Date||"",q=qtyOf(x),r=rateOf(x),t=totalOf(x),p=paidOf(x),d=dueOf(x);return `<tr><td>${esc(fmtDate(date))}</td><td><span class="pill ${type.toLowerCase().includes("sale")?"sell":"buy"}">${esc(type)}</span></td><td>${esc(party)}</td><td>NORMAL RICE</td><td class="num">${qty(q)}</td><td class="num">${money(r)}</td><td class="num">${money(t)}</td><td class="num">${money(p)}</td><td class="num"><span class="pill ${Number(d)>0?"due":"paid"}">${money(d)}</span></td></tr>`}).join("")}
 function filterHistory(){let q=($("#search").value||"").toLowerCase(),rows=[...purchases.map(x=>({...x,__type:"Purchase"})),...sales.map(x=>({...x,__type:"Sale"}))].filter(x=>String(x.partyName||x["Party Name"]||x["Party Name / ପାର୍ଟି ନାମ"]||"").toLowerCase().includes(q));$("#historyBody").innerHTML=historyRows(rows)}
-function partiesPage(){let map=new Map();[...purchases,...sales].forEach(x=>{let n=partyNameOf(x);if(!n)return;let o=map.get(n)||{name:n,kg:0,amt:0,due:0};o.kg+=qtyOf(x);o.amt+=totalOf(x);o.due+=dueOf(x);map.set(n,o)});let arr=[...map.values()];return `<div class="card"><div class="toolbar"><div class="grow"><h2>👥 Party Master / ପାର୍ଟି</h2><small>${lang==="or"?"ଲେନଦେନ ଅନୁସାରେ ପାର୍ଟି":"Parties from transactions"}</small></div><button class="btn primary" onclick="toast('Add Party can be connected to PARTY MASTER')">＋ Add Party</button></div><div class="party-grid">${arr.length?arr.map(o=>`<div class="party"><div class="name">${esc(o.name)}</div><div class="meta">${qty(o.kg)} KG transactions</div><div class="amount">${money(o.amt)}</div><div class="meta">${o.due>0?"Due / ବାକି: "+money(o.due):"Paid / ସବୁ ଦିଆସରିଛି"}</div></div>`).join(""):`<div class="empty">No parties / ପାର୍ଟି ତଥ୍ୟ ନାହିଁ</div>`}</div></div>`}
+function partiesPage(){
+  const map=new Map();
+  parties.forEach(p=>{
+    const id=partyIdOf(p), name=partyNameOf(p);
+    if(name) map.set(String(id||name),{id,name,kg:0,amt:0,due:0});
+  });
+  [...purchases,...sales].forEach(x=>{
+    const id=partyIdOf(x), name=partyNameOf(x);
+    if(!name)return;
+    const key=String(id||name), o=map.get(key)||{id,name,kg:0,amt:0,due:0};
+    o.kg+=qtyOf(x); o.amt+=totalOf(x);
+    o.due+=dueOf(x); map.set(key,o);
+  });
+  const arr=[...map.values()];
+  return `<div class="card"><div class="toolbar"><div class="grow"><h2>👥 Party Master / ପାର୍ଟି</h2><small>${lang==="or"?"ପୁରୁଣା ପାର୍ଟି ବାଛିପାରିବେ, ନୂଆ ପାର୍ଟି ଏଣ୍ଟ୍ରି ସମୟରେ ଯୋଡ଼ାଯିବ":"Existing parties can be selected; new parties are added during entry"}</small></div></div>
+  <div class="party-grid">${arr.length?arr.map(o=>`<div class="party"><div class="name">${esc(o.name)}</div><div class="meta">${esc(o.id||"")} · ${qty(o.kg)} KG transactions</div><div class="amount">${money(o.amt)}</div><div class="meta">${o.due>0?"Due / ବାକି: "+money(o.due):"Paid / ସବୁ ଦିଆସରିଛି"}</div></div>`).join(""):`<div class="empty">${lang==="or"?"କୌଣସି ପାର୍ଟି ନାହିଁ":"No parties"}</div>`}</div></div>`
+}
 function stockPage(){let st=Number(dashboardData.currentStock||0);return `<div class="grid k3"><div class="card kpi blue"><span class="lbl">Opening / ଆରମ୍ଭ</span><span class="val">—</span></div><div class="card kpi green"><span class="lbl">Purchase / କିଣା</span><span class="val">${qty(dashboardData.purchaseQty)} KG</span></div><div class="card kpi orange"><span class="lbl">Sales / ବିକ୍ରି</span><span class="val">${qty(dashboardData.salesQty)} KG</span></div></div><div style="height:12px"></div><div class="card"><h2>📦 Closing Stock / ବାକି ଷ୍ଟକ୍</h2><div style="font-size:2.4rem;font-weight:900;margin-top:10px">${qty(st)} KG</div><small>Normal Rice / ସାଧାରଣ ଚାଉଳ</small></div>`}
 function printPage(){return `<div class="card"><div class="toolbar"><div class="grow"><h2>🖨️ Print Register / ପ୍ରିଣ୍ଟ</h2><small>${lang==="or"?"A4 ପ୍ରିଣ୍ଟ ପାଇଁ":"For A4 printing"}</small></div><button class="btn primary" onclick="window.print()">🖨️ Print</button></div><div class="card" style="background:white;color:#111;margin-top:10px"><h2 style="text-align:center;color:#111">RICE PURCHASE & SALES REGISTER</h2><p style="text-align:center;color:#333">NORMAL RICE / ସାଧାରଣ ଚାଉଳ</p>${printTable()}</div></div>`}
 function printTable(){let rows=[...purchases.map(x=>({...x,__type:"Purchase"})),...sales.map(x=>({...x,__type:"Sale"}))];return `<table class="data" style="min-width:0;color:#111"><thead><tr><th>Date</th><th>Type</th><th>Party</th><th>KG</th><th>Rate</th><th>Total</th><th>Paid</th><th>Due</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(fmtDate(x.date||x.Date||""))}</td><td>${esc(x.__type)}</td><td>${esc(x.partyName||x["Party Name"]||x["Party Name / ପାର୍ଟି ନାମ"]||"")}</td><td>${qty(qtyOf(x))}</td><td>${money(rateOf(x))}</td><td>${money(totalOf(x))}</td><td>${money(paidOf(x))}</td><td>${money(dueOf(x))}</td></tr>`).join("")}</tbody></table>`}
-function settings(){return `<div class="grid k2"><div class="card"><h2>⚙️ Settings / ସେଟିଂ</h2><div style="height:12px"></div><div class="field"><label>Google Apps Script API</label><input value="${API}" readonly></div><div style="height:10px"></div><div class="field"><label>Rice Type / ଚାଉଳ</label><input value="NORMAL RICE / ସାଧାରଣ ଚାଉଳ" readonly></div></div><div class="card"><h2>ℹ️ App</h2><p class="muted">GitHub Pages + Google Sheets</p><p class="muted">All purchase and sales records use one fixed rice type: NORMAL RICE.</p></div></div>`}
+function settings(){return `<div class="grid k2"><div class="card"><h2>⚙️ Settings / ସେଟିଂ</h2><div style="height:12px"></div><div class="field"><label>Google Apps Script API</label><input value="${API}" readonly></div><small style="display:block;margin-top:8px">${lang==="or"?"ନୂଆ ପାର୍ଟି ସେଭ୍ ପାଇଁ Code.gs ରେ addParty action ଥିବା ଦରକାର।":"New-party saving requires the addParty action in Code.gs."}</small><div style="height:10px"></div><div class="field"><label>Rice Type / ଚାଉଳ</label><input value="NORMAL RICE / ସାଧାରଣ ଚାଉଳ" readonly></div></div><div class="card"><h2>ℹ️ App</h2><p class="muted">GitHub Pages + Google Sheets</p><p class="muted">All purchase and sales records use one fixed rice type: NORMAL RICE.</p></div></div>`}
 function draw(){activeNav();updateLanguageButton();let titles={dashboard:"Dashboard / ଡ୍ୟାସବୋର୍ଡ",purchase:"Purchase / କିଣା",sale:"Sales / ବିକ୍ରି",history:"History / ହିସାବ",parties:"Parties / ପାର୍ଟି",stock:"Stock / ଷ୍ଟକ୍",print:"Print / ପ୍ରିଣ୍ଟ",settings:"Settings / ସେଟିଂ"};$("#pageTitle").textContent=titles[page];let content=page==="dashboard"?dashboard():page==="purchase"?form("purchase"):page==="sale"?form("sale"):page==="history"?history():page==="parties"?partiesPage():page==="stock"?stockPage():page==="print"?printPage():settings();$("#root").innerHTML=content;if(page==="purchase"||page==="sale")bindCalc()}
 function updateOnline(){let o=navigator.onLine;$("#online").textContent=o?"● Online":"● Offline";$("#online").classList.toggle("on",o)}
 window.addEventListener("online",updateOnline);window.addEventListener("offline",updateOnline);
