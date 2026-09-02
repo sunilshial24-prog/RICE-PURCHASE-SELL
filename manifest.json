@@ -1,0 +1,10 @@
+{
+  "name": "Rice Purchase & Sales Register",
+  "short_name": "Rice Register",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#0f4c5c",
+  "description": "Bilingual Odia and English rice purchase and sales register",
+  "icons": []
+}

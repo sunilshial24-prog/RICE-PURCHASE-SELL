@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f4c5c">
+<meta name="description" content="Rice Purchase & Sales Register - Odia and English">
+<link rel="manifest" href="manifest.json">
+<title>Rice Register</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f7fa}
+  .safe{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .nav{padding-bottom:env(safe-area-inset-bottom)}
+  .card{box-shadow:0 2px 12px rgba(15,76,92,.08)}
+  input,select,textarea{font-size:16px}
+  .hide{display:none!important}
+  .toast{transform:translateY(120px);transition:.25s}
+  .toast.show{transform:translateY(0)}
+</style>
+</head>
+<body class="text-slate-800">
+<div id="app" class="max-w-5xl mx-auto min-h-screen safe">
+<header class="sticky top-0 z-20 bg-[#0f4c5c] text-white px-4 py-3 shadow">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 id="appTitle" class="font-bold text-lg">Rice Register</h1>
+      <p id="appSub" class="text-xs opacity-80">Purchase & Sales</p>
+    </div>
+    <button id="langBtn" onclick="toggleLang()" class="bg-white/15 px-3 py-2 rounded-lg text-sm">ଓଡ଼ିଆ</button>
+  </div>
+</header>
+
+<main class="p-4">
+<section id="dashboard" class="page">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-bold" data-i18n="dashboard">Dashboard</h2>
+    <button onclick="loadDashboard()" class="text-sm px-3 py-2 rounded-lg bg-white border">↻</button>
+  </div>
+  <div class="grid grid-cols-2 gap-3">
+    <div class="card bg-white rounded-2xl p-4"><p class="text-xs text-slate-500" data-i18n="purchaseKg">Purchase KG</p><p id="purchaseQty" class="text-2xl font-bold mt-1">0</p></div>
+    <div class="card bg-white rounded-2xl p-4"><p class="text-xs text-slate-500" data-i18n="salesKg">Sales KG</p><p id="salesQty" class="text-2xl font-bold mt-1">0</p></div>
+    <div class="card bg-white rounded-2xl p-4"><p class="text-xs text-slate-500" data-i18n="purchaseValue">Purchase Value</p><p id="purchaseValue" class="text-xl font-bold mt-1">₹0</p></div>
+    <div class="card bg-white rounded-2xl p-4"><p class="text-xs text-slate-500" data-i18n="salesValue">Sales Value</p><p id="salesValue" class="text-xl font-bold mt-1">₹0</p></div>
+    <div class="card bg-white rounded-2xl p-4"><p class="text-xs text-slate-500" data-i18n="purchaseDue">Purchase Due</p><p id="purchaseDue" class="text-xl font-bold mt-1">₹0</p></div>
+    <div class="card bg-white rounded-2xl p-4"><p class="text-xs text-slate-500" data-i18n="salesDue">Sales Due</p><p id="salesDue" class="text-xl font-bold mt-1">₹0</p></div>
+    <div class="card bg-white rounded-2xl p-4 col-span-2"><p class="text-xs text-slate-500" data-i18n="currentStock">Current Stock</p><p id="currentStock" class="text-3xl font-bold mt-1 text-[#0f4c5c]">0 KG</p></div>
+  </div>
+</section>
+
+<section id="purchase" class="page hide">
+  <h2 class="text-xl font-bold mb-4" data-i18n="purchase">Rice Purchase</h2>
+  <form id="purchaseForm" class="bg-white card rounded-2xl p-4 space-y-3">
+    <div class="grid grid-cols-2 gap-3">
+      <label><span class="label text-sm">ତାରିଖ / Date</span><input name="date" type="date" required class="w-full border rounded-xl p-3 mt-1"></label>
+      <label><span class="label text-sm">କିଣା ନଂ / Purchase No.</span><input name="purchaseNo" placeholder="Auto" class="w-full border rounded-xl p-3 mt-1"></label>
+    </div>
+    <label><span class="label text-sm" data-i18n="party">ପାର୍ଟି / ଗ୍ରାହକ / Party</span><select name="partyId" id="purchaseParty" onchange="setPartyName(this,'purchasePartyName')" required class="w-full border rounded-xl p-3 mt-1"></select></label>
+    <input type="hidden" name="partyName" id="purchasePartyName">
+    <label><span class="label text-sm" data-i18n="rice">Rice</span><input value="Normal Rice" readonly class="w-full border rounded-xl p-3 mt-1 bg-slate-50"><input type="hidden" name="riceId" id="purchaseRice" value="R001"><input type="hidden" name="riceName" id="purchaseRiceName" value="Normal Rice"></label>
+    <input type="hidden" name="riceName" id="purchaseRiceName">
+    <div class="grid grid-cols-2 gap-3">
+      <label><span class="label text-sm" data-i18n="qty">ପରିମାଣ / Quantity (KG)</span><input name="qty" id="purchaseQtyInput" type="number" step="0.01" min="0" required class="w-full border rounded-xl p-3 mt-1"></label>
+      <label><span class="label text-sm" data-i18n="rate">ଦର / Rate per KG</span><input name="rate" id="purchaseRateInput" type="number" step="0.01" min="0" required class="w-full border rounded-xl p-3 mt-1"></label>
+    </div>
+    <div class="rounded-xl bg-slate-50 border p-3 flex justify-between"><span>ମୋଟ / Total</span><b id="purchaseTotal">₹0</b></div>
+    <label><span class="label text-sm" data-i18n="paid">ଦେଇଥିବା ଟଙ୍କା / Paid</span><input name="paid" id="purchasePaidInput" type="number" step="0.01" min="0" value="0" class="w-full border rounded-xl p-3 mt-1"></label>
+    <div class="rounded-xl bg-amber-50 border p-3 flex justify-between"><span>ବାକି / Due</span><b id="purchaseDueLive">₹0</b></div>
+    <label><span class="label text-sm" data-i18n="paymentMode">Payment Mode</span><select name="paymentMode" class="w-full border rounded-xl p-3 mt-1"><option>Cash</option><option>Bank</option><option>UPI</option><option>Other</option></select></label>
+    <label><span class="label text-sm" data-i18n="remarks">Remarks</span><textarea name="remarks" rows="2" class="w-full border rounded-xl p-3 mt-1"></textarea></label>
+    <button class="w-full bg-[#0f4c5c] text-white rounded-xl py-3 font-semibold" data-i18n="savePurchase">Save Purchase</button>
+  </form>
+</section>
+
+<section id="sale" class="page hide">
+  <h2 class="text-xl font-bold mb-4" data-i18n="sale">Rice Sale</h2>
+  <form id="saleForm" class="bg-white card rounded-2xl p-4 space-y-3">
+    <div class="grid grid-cols-2 gap-3">
+      <label><span class="label text-sm">ତାରିଖ / Date</span><input name="date" type="date" required class="w-full border rounded-xl p-3 mt-1"></label>
+      <label><span class="label text-sm">ବିଲ୍ ନଂ / Invoice No.</span><input name="invoiceNo" placeholder="Auto" class="w-full border rounded-xl p-3 mt-1"></label>
+    </div>
+    <label><span class="label text-sm" data-i18n="party">ପାର୍ଟି / ଗ୍ରାହକ / Party</span><select name="partyId" id="saleParty" onchange="setPartyName(this,'salePartyName')" required class="w-full border rounded-xl p-3 mt-1"></select></label>
+    <input type="hidden" name="partyName" id="salePartyName">
+    <label><span class="label text-sm" data-i18n="rice">Rice</span><input value="Normal Rice" readonly class="w-full border rounded-xl p-3 mt-1 bg-slate-50"><input type="hidden" name="riceId" id="saleRice" value="R001"><input type="hidden" name="riceName" id="saleRiceName" value="Normal Rice"></label>
+    <input type="hidden" name="riceName" id="saleRiceName">
+    <div class="grid grid-cols-2 gap-3">
+      <label><span class="label text-sm" data-i18n="qty">ପରିମାଣ / Quantity (KG)</span><input name="qty" id="saleQtyInput" type="number" step="0.01" min="0" required class="w-full border rounded-xl p-3 mt-1"></label>
+      <label><span class="label text-sm" data-i18n="rate">ଦର / Rate per KG</span><input name="rate" id="saleRateInput" type="number" step="0.01" min="0" required class="w-full border rounded-xl p-3 mt-1"></label>
+    </div>
+    <div class="rounded-xl bg-slate-50 border p-3 flex justify-between"><span>ମୋଟ / Total</span><b id="saleTotal">₹0</b></div>
+    <label><span class="label text-sm" data-i18n="received">ପାଇଥିବା ଟଙ୍କା / Received</span><input name="received" id="saleReceivedInput" type="number" step="0.01" min="0" value="0" class="w-full border rounded-xl p-3 mt-1"></label>
+    <div class="rounded-xl bg-amber-50 border p-3 flex justify-between"><span>ପାଇବା ବାକି / Due</span><b id="saleDueLive">₹0</b></div>
+    <label><span class="label text-sm" data-i18n="paymentMode">Payment Mode</span><select name="paymentMode" class="w-full border rounded-xl p-3 mt-1"><option>Cash</option><option>Bank</option><option>UPI</option><option>Other</option></select></label>
+    <label><span class="label text-sm" data-i18n="remarks">Remarks</span><textarea name="remarks" rows="2" class="w-full border rounded-xl p-3 mt-1"></textarea></label>
+    <button class="w-full bg-[#0f4c5c] text-white rounded-xl py-3 font-semibold" data-i18n="saveSale">Save Sale</button>
+  </form>
+</section>
+
+<section id="parties" class="page hide">
+  <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold" data-i18n="parties">Parties</h2><button onclick="loadParties()" class="px-3 py-2 bg-white border rounded-lg">↻</button></div>
+  <form id="partyForm" class="bg-white card rounded-2xl p-4 space-y-3 mb-4">
+    <input id="partyNameInput" name="partyName" required placeholder="Party / Customer Name" class="w-full border rounded-xl p-3">
+    <input name="mobile" placeholder="Mobile" class="w-full border rounded-xl p-3">
+    <select name="type" class="w-full border rounded-xl p-3"><option>Customer</option><option>Supplier</option><option>A-Party</option><option>Both</option><option>Other</option></select>
+    <input name="openingBalance" type="number" step="0.01" value="0" placeholder="Opening Balance" class="w-full border rounded-xl p-3">
+    <select name="balanceType" class="w-full border rounded-xl p-3"><option>None</option><option>Receivable</option><option>Payable</option></select>
+    <input name="address" placeholder="Address" class="w-full border rounded-xl p-3">
+    <input name="remarks" placeholder="Remarks" class="w-full border rounded-xl p-3">
+    <button class="w-full bg-[#0f4c5c] text-white rounded-xl py-3 font-semibold" data-i18n="addParty">Add Party</button>
+  </form>
+  <div id="partyList" class="space-y-2"></div>
+</section>
+
+<section id="rice" class="page hide">
+  <h2 class="text-xl font-bold mb-4" data-i18n="riceMaster">Rice Type</h2>
+  <div class="bg-white card rounded-2xl p-5 space-y-4">
+    <div class="rounded-xl bg-slate-50 p-4">
+      <p class="text-xs text-slate-500" data-i18n="onlyRice">Only Rice Type</p>
+      <p class="text-xl font-bold mt-1">Normal Rice</p>
+      <p class="text-xs text-slate-500 mt-1">R001 · KG</p>
+    </div>
+    <p class="text-sm text-slate-600" data-i18n="riceFixedNote">This register uses only Normal Rice. No separate rice types are required.</p>
+  </div>
+</section>
+
+<section id="reports" class="page hide">
+  <h2 class="text-xl font-bold mb-4" data-i18n="reports">Reports</h2>
+  <div class="grid grid-cols-2 gap-3">
+    <button onclick="loadReport('purchase')" class="bg-white card rounded-2xl p-4 text-left"><b data-i18n="purchase">Purchase</b><div class="text-xs text-slate-500 mt-1" data-i18n="viewRecords">View records</div></button>
+    <button onclick="loadReport('sales')" class="bg-white card rounded-2xl p-4 text-left"><b data-i18n="sale">Sales</b><div class="text-xs text-slate-500 mt-1" data-i18n="viewRecords">View records</div></button>
+    <button onclick="loadReport('stock')" class="bg-white card rounded-2xl p-4 text-left"><b data-i18n="stock">Stock</b><div class="text-xs text-slate-500 mt-1" data-i18n="viewRecords">View records</div></button>
+    <button onclick="loadReport('ledger')" class="bg-white card rounded-2xl p-4 text-left"><b data-i18n="ledger">Party Ledger</b><div class="text-xs text-slate-500 mt-1" data-i18n="viewRecords">View records</div></button>
+  </div>
+  <div id="reportBox" class="mt-4"></div>
+</section>
+
+<section id="settings" class="page hide">
+  <h2 class="text-xl font-bold mb-4" data-i18n="settings">Settings</h2>
+  <div class="bg-white card rounded-2xl p-4 space-y-3">
+    <p class="text-sm text-slate-600">Google Sheet API connected. Party names can be edited from the Parties section.</p>
+    <div class="bg-slate-50 rounded-xl p-3 text-xs break-all" id="apiDisplay"></div>
+    <button onclick="refreshAll()" class="w-full bg-[#0f4c5c] text-white rounded-xl py-3 font-semibold" data-i18n="refresh">Refresh Data</button>
+  </div>
+</section>
+</main>
+
+<nav class="nav fixed bottom-0 left-0 right-0 z-30 bg-white border-t max-w-5xl mx-auto">
+  <div class="grid grid-cols-4">
+    <button onclick="showPage('dashboard')" class="navbtn p-2 text-xs"><div>📊</div><span data-i18n="dashboard">Dashboard</span></button>
+    <button onclick="showPage('purchase')" class="navbtn p-2 text-xs"><div>📥</div><span data-i18n="purchase">Purchase</span></button>
+    <button onclick="showPage('sale')" class="navbtn p-2 text-xs"><div>📤</div><span data-i18n="sale">Sale</span></button>
+    <button onclick="showPage('parties')" class="navbtn p-2 text-xs"><div>👥</div><span data-i18n="parties">Parties</span></button>
+    <button onclick="showPage('reports')" class="navbtn p-2 text-xs"><div>📒</div><span data-i18n="reports">Reports</span></button>
+  </div>
+</nav>
+<div id="toast" class="toast fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl text-sm"></div>
+</div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbyfYGKKSJa-ygV0ETNyL4CU6dJae8B7rOffCpS7GriB99-D72t2sh3TZT3GThq-qx0KCA/exec";
+let lang = localStorage.getItem("riceLang") || "or";
+let parties=[], riceItems=[{"Rice ID":"R001","Rice Name":"Normal Rice","ଚାଉଳ ନାମ":"Normal Rice"}];
+
+const T={
+  en:{dashboard:"Dashboard",purchase:"Rice Purchase",sale:"Rice Sale",parties:"Parties",reports:"Reports",riceMaster:"Rice Type",settings:"Settings",onlyRice:"Only Rice Type",riceFixedNote:"This register uses only Normal Rice. No separate rice types are required.",purchaseKg:"Purchase KG",salesKg:"Sales KG",purchaseValue:"Purchase Value",salesValue:"Sales Value",purchaseDue:"Purchase Due",salesDue:"Sales Due",currentStock:"Current Stock",party:"Party / Customer",rice:"Rice",qty:"Quantity (KG)",rate:"Rate / KG",paid:"Paid",received:"Received",paymentMode:"Payment Mode",remarks:"Remarks",savePurchase:"Save Purchase",saveSale:"Save Sale",addParty:"Add Party",addRice:"Add Rice",stock:"Stock",ledger:"Party Ledger",viewRecords:"View records",refresh:"Refresh Data"},
+  or:{dashboard:"ଡ୍ୟାସବୋର୍ଡ",purchase:"ଚାଉଳ କିଣା",sale:"ଚାଉଳ ବିକ୍ରି",parties:"ପାର୍ଟି / ଗ୍ରାହକ",reports:"ରିପୋର୍ଟ",riceMaster:"ଚାଉଳ ପ୍ରକାର",settings:"ସେଟିଂ",onlyRice:"କେବଳ ଚାଉଳ ପ୍ରକାର",riceFixedNote:"ଏହି ରେଜିଷ୍ଟରରେ କେବଳ Normal Rice ରହିବ। ଅଲଗା ଚାଉଳ ପ୍ରକାର ଦରକାର ନାହିଁ।",purchaseKg:"କିଣା ଚାଉଳ (କିଲୋ)",salesKg:"ବିକ୍ରି ଚାଉଳ (କିଲୋ)",purchaseValue:"କିଣା ଟଙ୍କା",salesValue:"ବିକ୍ରି ଟଙ୍କା",purchaseDue:"ଦେବା ବାକି",salesDue:"ପାଇବା ବାକି",currentStock:"ବର୍ତ୍ତମାନ ଷ୍ଟକ୍",party:"ପାର୍ଟି / ଗ୍ରାହକ",rice:"ଚାଉଳ",qty:"ପରିମାଣ (କିଲୋ)",rate:"କିଲୋ ପିଛା ଦର",paid:"ଦେଇଥିବା ଟଙ୍କା",received:"ପାଇଥିବା ଟଙ୍କା",paymentMode:"ଟଙ୍କା ଦେବା ପ୍ରକାର",remarks:"ଅଧିକ ତଥ୍ୟ",savePurchase:"କିଣା ସେଭ୍ କରନ୍ତୁ",saveSale:"ବିକ୍ରି ସେଭ୍ କରନ୍ତୁ",addParty:"ପାର୍ଟି ଯୋଡନ୍ତୁ",addRice:"ଚାଉଳ ଯୋଡନ୍ତୁ",stock:"ଷ୍ଟକ୍",ledger:"ପାର୍ଟି ହିସାବ",viewRecords:"ତଥ୍ୟ ଦେଖନ୍ତୁ",refresh:"ତଥ୍ୟ ରିଫ୍ରେଶ କରନ୍ତୁ"}
+};
+
+function tr(k){return T[lang][k]||k}
+function applyLang(){
+ document.documentElement.lang=lang==="or"?"or":"en";
+ document.querySelectorAll("[data-i18n]").forEach(e=>e.textContent=tr(e.dataset.i18n));
+ document.getElementById("langBtn").textContent=lang==="or"?"English":"ଓଡ଼ିଆ";
+ document.getElementById("appTitle").textContent=lang==="or"?"ଚାଉଳ ହିସାବ":"Rice Register";
+ document.getElementById("appSub").textContent=lang==="or"?"କିଣା ଓ ବିକ୍ରି":"Purchase & Sales";
+}
+function toggleLang(){lang=lang==="or"?"en":"or";localStorage.setItem("riceLang",lang);applyLang()}
+function showPage(id){
+ document.querySelectorAll(".page").forEach(p=>p.classList.add("hide"));
+ document.getElementById(id).classList.remove("hide");
+ if(id==="dashboard")loadDashboard();
+ if(id==="parties")loadParties();
+ if(id==="rice")loadRice();
+}
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
+async function apiGet(action){
+ const r=await fetch(API_URL+"?action="+encodeURIComponent(action),{cache:"no-store"});
+ return await r.json();
+}
+async function apiPost(payload){
+ const r=await fetch(API_URL,{method:"POST",body:JSON.stringify(payload)});
+ return await r.json();
+}
+function money(v){return "₹"+Number(v||0).toLocaleString("en-IN",{maximumFractionDigits:2})}
+function setPartyName(sel,id){const x=parties.find(p=>p["Party ID"]===sel.value);document.getElementById(id).value=x?x["ପାର୍ଟି / ଗ୍ରାହକ ନାମ"]||x["Party Name"]||"":""}
+function setRiceName(sel,id){const x=riceItems.find(p=>p["Rice ID"]===sel.value);document.getElementById(id).value=x?x["ଚାଉଳ ନାମ"]||x["Rice Name"]||"":""}
+function fillSelect(id,items,idKey,nameKeys,placeholder){
+ const s=document.getElementById(id);s.innerHTML='<option value="">'+placeholder+'</option>';
+ items.forEach(x=>{const v=x[idKey];const n=nameKeys.map(k=>x[k]).find(Boolean)||v;s.innerHTML+=`<option value="${esc(v)}">${esc(v)} - ${esc(n)}</option>`});
+}
+function esc(x){return String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+async function editPartyName(partyId, currentName){
+ const newName=prompt(lang==="or"?"ନୂଆ ପାର୍ଟି / ଗ୍ରାହକ ନାମ ଲେଖନ୍ତୁ":"Enter new party / customer name",currentName||"");
+ if(!newName || newName.trim()===currentName) return;
+ toast(lang==="or"?"ନାମ ବଦଳାଇବା ପାଇଁ Sheet ରେ ଅପଡେଟ୍ API ଆବଶ୍ୟକ":"Name editing needs the update API in Google Apps Script");
+}
+async function loadParties(){
+ try{const j=await apiGet("parties");parties=j.data||[];fillSelect("purchaseParty",parties,"Party ID",["Party Name","ପାର୍ଟି / ଗ୍ରାହକ ନାମ"],"Select party");fillSelect("saleParty",parties,"Party ID",["Party Name","ପାର୍ଟି / ଗ୍ରାହକ ନାମ"],"Select party");
+ document.getElementById("partyList").innerHTML=parties.filter(x=>x["Party ID"]).map(x=>{const id=x["Party ID"];const name=x["ପାର୍ଟି / ଗ୍ରାହକ ନାମ"]||x["Party Name"]||"";return `<div class="bg-white card rounded-xl p-3"><div class="flex gap-2 items-center"><input id="partyName_${esc(id)}" value="${esc(name)}" class="flex-1 border rounded-lg p-2 text-sm"><button onclick="updateParty('${esc(id)}')" class="bg-[#0f4c5c] text-white rounded-lg px-3 py-2 text-sm">Save</button></div><div class="text-xs text-slate-500 mt-2">${esc(id)} · ${esc(x.Mobile||"")} · ${esc(x["Balance Type"]||"")}</div></div>`}).join("")||'<div class="text-sm text-slate-500">No parties yet.</div>';
+ }catch(e){toast("Could not load parties")}
+}
+async function updateParty(partyId){
+ const input=document.getElementById("partyName_"+partyId);
+ const party=parties.find(x=>x["Party ID"]===partyId);
+ if(!input||!party)return;
+ const name=input.value.trim();
+ if(!name){toast("Enter party name");return}
+ try{
+   const j=await apiPost({action:"updateParty",partyId:partyId,partyName:name});
+   if(j.success){toast(lang==="or"?"ପାର୍ଟି ନାମ ବଦଳାଗଲା":"Party name updated");await loadParties();}
+   else toast(j.message||j.error||"Update failed");
+ }catch(e){toast("Connection failed")}
+}
+async function loadRice(){
+  riceItems=[{"Rice ID":"R001","Rice Name":"NORMAL RICE","ଚାଉଳ ନାମ":"ସାଧାରଣ ଚାଉଳ","Opening Stock (KG)":"0"}];
+  const box=document.getElementById("riceList");
+  if(box) box.innerHTML='<div class="bg-white card rounded-xl p-3"><div class="font-semibold">NORMAL RICE / ସାଧାରଣ ଚାଉଳ</div><div class="text-xs text-slate-500">R001 · Single rice type</div></div>';
+}
+
+async function loadDashboard(){
+ try{const j=await apiGet("dashboard");document.getElementById("purchaseQty").textContent=Number(j.purchaseQty||0).toLocaleString();document.getElementById("salesQty").textContent=Number(j.salesQty||0).toLocaleString();document.getElementById("purchaseValue").textContent=money(j.purchaseValue);document.getElementById("salesValue").textContent=money(j.salesValue);document.getElementById("purchaseDue").textContent=money(j.purchaseDue);document.getElementById("salesDue").textContent=money(j.salesDue);document.getElementById("currentStock").textContent=Number(j.currentStock||0).toLocaleString()+" KG"}catch(e){toast("Dashboard load failed")}}
+function calcLive(qtyId,rateId,payId,totalId,dueId){
+ const q=Number(document.getElementById(qtyId)?.value||0);
+ const r=Number(document.getElementById(rateId)?.value||0);
+ const p=Number(document.getElementById(payId)?.value||0);
+ const total=q*r, due=Math.max(0,total-p);
+ document.getElementById(totalId).textContent=money(total);
+ document.getElementById(dueId).textContent=money(due);
+}
+["purchaseQtyInput","purchaseRateInput","purchasePaidInput"].forEach(id=>document.getElementById(id)?.addEventListener("input",()=>calcLive("purchaseQtyInput","purchaseRateInput","purchasePaidInput","purchaseTotal","purchaseDueLive")));
+["saleQtyInput","saleRateInput","saleReceivedInput"].forEach(id=>document.getElementById(id)?.addEventListener("input",()=>calcLive("saleQtyInput","saleRateInput","saleReceivedInput","saleTotal","saleDueLive")));
+
+async function submitForm(form,action){
+ const fd=new FormData(form);const data=Object.fromEntries(fd.entries());data.action=action;
+ try{const j=await apiPost(data);if(j.success){toast(j.message||"Saved");form.reset();setDefaultDates();loadDashboard()}else toast(j.message||j.error||"Save failed")}catch(e){toast("Connection failed")}}
+document.getElementById("purchaseForm").addEventListener("submit",e=>{e.preventDefault();submitForm(e.target,"addPurchase")});
+document.getElementById("saleForm").addEventListener("submit",e=>{e.preventDefault();submitForm(e.target,"addSale")});
+document.getElementById("partyForm").addEventListener("submit",e=>{e.preventDefault();submitForm(e.target,"addParty").then(loadParties)});
+document.getElementById("riceForm").addEventListener("submit",e=>{e.preventDefault();submitForm(e.target,"addRice").then(loadRice)});
+async function loadReport(type){
+ const map={purchase:"purchases",sales:"sales",stock:"stock",ledger:"ledger"};
+ const j=await apiGet(map[type]);const rows=j.data||[];const box=document.getElementById("reportBox");
+ if(!rows.length){box.innerHTML='<div class="bg-white rounded-xl p-4 text-sm text-slate-500">No records.</div>';return}
+ const keys=Object.keys(rows[0]);const show=keys.slice(0,Math.min(keys.length,8));
+ box.innerHTML='<div class="overflow-auto bg-white rounded-xl"><table class="w-full text-xs"><thead><tr>'+show.map(k=>`<th class="p-2 bg-slate-100 text-left whitespace-nowrap">${esc(k)}</th>`).join("")+'</tr></thead><tbody>'+rows.slice(-100).reverse().map(r=>'<tr class="border-t">'+show.map(k=>`<td class="p-2 whitespace-nowrap">${esc(r[k])}</td>`).join("")+'</tr>').join("")+'</tbody></table></div>';
+}
+function setDefaultDates(){document.querySelectorAll('input[type="date"]').forEach(x=>{if(!x.value)x.value=new Date().toISOString().slice(0,10)})}
+async function refreshAll(){await Promise.all([loadParties(),loadRice(),loadDashboard()]);toast("Data refreshed")}
+document.getElementById("apiDisplay").textContent=API_URL;
+applyLang();setDefaultDates();refreshAll();
+if("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+</script>
+</body>
+</html>
