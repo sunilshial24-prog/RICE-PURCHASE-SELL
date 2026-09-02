@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1220">
-<link rel="manifest" href="./manifest.json">
+
 <title>Rice Buy & Sell Register</title>
 <style>
 :root{--bg:#0b1220;--panel:#0f172a;--panel2:#111c34;--card:#0e1a33;--line:#1e2b4d;--line2:#243357;--text:#e5eefc;--muted:#93a4c7;--accent:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--purple:#a855f7;--orange:#f97316;--shadow:0 10px 30px rgba(0,0,0,.30);--r:16px}
@@ -68,7 +68,7 @@ button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}h1
 </nav>
 
 <script>
-const API="https://script.google.com/macros/s/AKfycbyfYGKKSJa-ygV0ETNyL4CU6dJae8B7rOffCpS7GriB99-D72t2sh3TZT3GThq-qx0KCA/exec";
+const API="https://script.google.com/macros/s/AKfycbwpu7XHWFM-SX23H2TCcpAWCJeauHy7fKFokNx8N_JTugC9WTlYsi2aPvlmj-x6kyTZDQ/exec";
 let page="dashboard", lang="or", parties=[], purchases=[], sales=[], dashboardData={};
 try { lang = localStorage.getItem("riceRegisterLang") || "or"; } catch(e) {}
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -77,8 +77,51 @@ const qty=n=>Number(n||0).toLocaleString("en-IN",{maximumFractionDigits:2});
 function esc(x){return String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function fmtDate(x){if(!x)return "";let d=new Date(x);if(!isNaN(d))return d.toLocaleDateString("en-GB");return String(x).replace(/T.*Z?$/,"")}
 function toast(t){let x=document.createElement("div");x.className="toast";x.textContent=t;document.body.appendChild(x);setTimeout(()=>x.remove(),2200)}
-async function get(a){let r=await fetch(API+"?action="+encodeURIComponent(a));return r.json()}
-async function post(x){let r=await fetch(API,{method:"POST",body:JSON.stringify(x)});return r.json()}
+async function apiJson(url, options){
+  const r = await fetch(url, options);
+  const text = await r.text();
+  let j;
+  try { j = JSON.parse(text); }
+  catch(e){ throw new Error(text || ("HTTP "+r.status)); }
+  if(!r.ok || j.success===false) throw new Error(j.message || ("HTTP "+r.status));
+  return j;
+}
+async function get(a){
+  return apiJson(API+"?action="+encodeURIComponent(a)+"&_="+Date.now(), {
+    method:"GET",
+    cache:"no-store"
+  });
+}
+async function post(x){
+  return apiJson(API, {
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify(x)
+  });
+}
+function arr(j){
+  if(Array.isArray(j)) return j;
+  if(Array.isArray(j.data)) return j.data;
+  if(Array.isArray(j.rows)) return j.rows;
+  if(Array.isArray(j.records)) return j.records;
+  return [];
+}
+function num(...v){
+  for(const x of v){
+    if(x!==undefined && x!==null && x!==""){
+      const n=Number(String(x).replace(/,/g,"").replace(/[₹]/g,""));
+      if(Number.isFinite(n)) return n;
+    }
+  }
+  return 0;
+}
+function partyIdOf(p){return p["Party ID"]??p["PartyID"]??p.ID??p.partyId??p.party_id??""}
+function partyNameOf(p){return p["Party Name / ପାର୍ଟି ନାମ"]??p["Party Name"]??p["Party Name/ପାର୍ଟି ନାମ"]??p["ପାର୍ଟି / ଗ୍ରାହକ ନାମ"]??p.Name??p.partyName??p.party_name??""}
+function qtyOf(x){return num(x.qty,x["Qty (KG)"],x["Quantity (KG)"],x.Quantity,x.quantity,x["KG"])}
+function rateOf(x){return num(x.rate,x["Rate / KG"],x.Rate,x.ratePerKg,x["Rate/KG"])}
+function totalOf(x){return num(x.total,x["Total Amount"],x.Total,x.Amount,x["Total"])}
+function paidOf(x){return num(x.paid,x.received,x.Paid,x.Received,x["Paid/Received"],x["Amount Paid"],x["Amount Received"])}
+function dueOf(x){return num(x.due,x.Due,x["Remaining Amount"],x.Balance,x["Balance Amount"])}
 function toggleMenu(){$("#sidebar").classList.toggle("open")}
 function toggleLang(){
   lang = lang === "or" ? "en" : "or";
@@ -94,9 +137,24 @@ function setPage(p){page=p;toggleMenu();draw()}
 $$("[data-page]").forEach(b=>b.addEventListener("click",()=>setPage(b.dataset.page)));
 function activeNav(){$$("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===page))}
 async function refreshAll(){
- try{let [pa,pu,sa,da]=await Promise.all([get("parties"),get("purchases"),get("sales"),get("dashboard")]);parties=pa.data||[];purchases=pu.data||[];sales=sa.data||[];dashboardData=da||{};draw()}catch(e){toast(lang==="or"?"ସିଟ୍ ସହିତ ସଂଯୋଗ ହୋଇପାରିଲା ନାହିଁ":"Could not connect to Google Sheet")}
+  try{
+    const [pa,pu,sa,da]=await Promise.all([
+      get("parties"), get("purchases"), get("sales"), get("dashboard")
+    ]);
+    parties=arr(pa);
+    purchases=arr(pu);
+    sales=arr(sa);
+    dashboardData=da?.data && !Array.isArray(da.data) ? da.data : (da||{});
+    draw();
+  }catch(e){
+    console.error(e);
+    toast((lang==="or"?"Google Sheet ସଂଯୋଗ ବିଫଳ: ":"Google Sheet connection failed: ")+e.message);
+  }
 }
-function partyOptions(){return `<option value="">${lang==="or"?"ପାର୍ଟି ବାଛନ୍ତୁ":"Select Party"}</option>`+parties.map(p=>{let id=p["Party ID"]||p.ID||p.partyId||"",n=p["Party Name / ପାର୍ଟି ନାମ"]||p["Party Name"]||p["ପାର୍ଟି / ଗ୍ରାହକ ନାମ"]||p.Name||p.partyName||"";return `<option value="${esc(id)}">${esc(n)}</option>`}).join("")}
+function partyOptions(){
+  return `<option value="">${lang==="or"?"ପାର୍ଟି ବାଛନ୍ତୁ":"Select Party"}</option>`+
+    parties.map(p=>`<option value="${esc(partyIdOf(p))}">${esc(partyNameOf(p))}</option>`).join("");
+}
 function form(type){
  let sale=type==="sale", title=sale?(lang==="or"?"ବିକ୍ରି ଏଣ୍ଟ୍ରି":"Sales Entry"):(lang==="or"?"କିଣା ଏଣ୍ଟ୍ରି":"Purchase Entry");
  return `<div class="card"><div class="toolbar"><div class="grow"><h2>${title}</h2><small>🍚 NORMAL RICE / ସାଧାରଣ ଚାଉଳ</small></div><span class="badge">${sale?"SELL / ବିକ୍ରି":"BUY / କିଣା"}</span></div>
@@ -116,23 +174,59 @@ function bindCalc(){["qty","rate","paid"].forEach(id=>$("#"+id)?.addEventListene
 async function saveEntry(e,type){
   e.preventDefault();
   const x=Object.fromEntries(new FormData(e.target));
-  const p=parties.find(z=>String(z['Party ID']||z.ID||z.partyId||'')===String(x.partyId||''));
-  x.partyName=p?.['Party Name / ପାର୍ଟି ନାମ']||p?.['Party Name']||p?.Name||p?.partyName||'';
-  x.action=type==='sale'?'addSale':'addPurchase';
-  x.riceId='R001'; x.riceName='NORMAL RICE';
-  x.total=(+x.qty||0)*(+x.rate||0);
-  x.due=Math.max(0,x.total-(+(x.paid||x.received)||0));
+  const p=parties.find(z=>String(partyIdOf(z))===String(x.partyId||""));
+  const partyName=partyNameOf(p||{});
+  const qtyVal=num(x.qty), rateVal=num(x.rate);
+  const amount=qtyVal*rateVal;
+  const paidVal=type==="sale"?num(x.received):num(x.paid);
+  const dueVal=Math.max(0,amount-paidVal);
+  const date=x.date || new Date().toISOString().slice(0,10);
+
+  const payload = {
+    action: type==="sale" ? "addSale" : "addPurchase",
+    type: type==="sale" ? "Sale" : "Purchase",
+    date: date,
+    partyId: x.partyId,
+    partyName: partyName,
+    riceId: "R001",
+    riceName: "NORMAL RICE",
+    qty: qtyVal,
+    rate: rateVal,
+    total: amount,
+    paid: type==="sale" ? 0 : paidVal,
+    received: type==="sale" ? paidVal : 0,
+    due: dueVal,
+    paymentMode: x.paymentMode || "Cash",
+    remarks: x.remarks || "",
+    // Exact workbook-style aliases:
+    "Date": date,
+    "Party ID": x.partyId,
+    "Party Name": partyName,
+    "Rice ID": "R001",
+    "Rice Name": "NORMAL RICE",
+    "Qty (KG)": qtyVal,
+    "Rate / KG": rateVal,
+    "Total Amount": amount,
+    "Paid": type==="sale" ? 0 : paidVal,
+    "Received": type==="sale" ? paidVal : 0,
+    "Due": dueVal,
+    "Payment Mode": x.paymentMode || "Cash",
+    "Remarks": x.remarks || ""
+  };
+
   try{
-    const j=await post(x);
-    if(!j.success) throw new Error(j.message||'Save failed');
-    toast(lang==='or'?'ତଥ୍ୟ ସଫଳତାର ସହିତ ସେଭ୍ ହେଲା':'Entry saved successfully');
+    const j=await post(payload);
+    toast(lang==="or"?"ତଥ୍ୟ ସଫଳତାର ସହିତ ସେଭ୍ ହେଲା":"Entry saved successfully");
     e.target.reset();
     await refreshAll();
-    setPage('history');
-  }catch(err){ toast(err.message||'Save failed'); }
+    setPage("history");
+  }catch(err){
+    console.error(err);
+    toast((lang==="or"?"ସେଭ୍ ବିଫଳ: ":"Save failed: ")+err.message);
+  }
 }
 function dashboard(){
- let d=dashboardData||{},pq=Number(d.purchaseQty||0),sq=Number(d.salesQty||0),pv=Number(d.purchaseValue||0),sv=Number(d.salesValue||0),pd=Number(d.purchaseDue||0),sd=Number(d.salesDue||0),st=Number(d.currentStock||0);
+ let d=dashboardData||{},pq=num(d.purchaseQty,d.purchaseKG,d["Purchase KG"]),sq=num(d.salesQty,d.salesKG,d["Sales KG"]),pv=num(d.purchaseValue,d["Purchase Value"]),sv=num(d.salesValue,d["Sales Value"]),pd=num(d.purchaseDue,d.payable,d["Supplier Due"]),sd=num(d.salesDue,d.receivable,d["Customer Due"]),st=num(d.currentStock,d.closingStock,d["Closing Stock"]);
  return `<div class="grid k4"><div class="card kpi blue"><span class="lbl">📥 ${lang==="or"?"ମୋଟ କିଣା":"Purchase Qty"}</span><span class="val">${qty(pq)} KG</span><span class="sub">${money(pv)} value</span></div><div class="card kpi green"><span class="lbl">📤 ${lang==="or"?"ମୋଟ ବିକ୍ରି":"Sales Qty"}</span><span class="val">${qty(sq)} KG</span><span class="sub">${money(sv)} value</span></div><div class="card kpi orange"><span class="lbl">💰 ${lang==="or"?"ଦେବା ବାକି":"Payable"}</span><span class="val">${money(pd)}</span><span class="sub">${lang==="or"?"ସପ୍ଲାୟରଙ୍କୁ ଦେବା":"To suppliers"}</span></div><div class="card kpi purple"><span class="lbl">💵 ${lang==="or"?"ପାଇବା ବାକି":"Receivable"}</span><span class="val">${money(sd)}</span><span class="sub">${lang==="or"?"ଗ୍ରାହକଙ୍କଠାରୁ ପାଇବା":"From customers"}</span></div></div>
  <div style="height:12px"></div><div class="card"><div class="toolbar"><div class="grow"><h3>⚡ ${lang==="or"?"ଦ୍ରୁତ କାମ":"Quick Actions"}</h3><small>${lang==="or"?"ଦୈନିକ କାମ ପାଇଁ":"For daily work"}</small></div><span class="badge on">● ${navigator.onLine?"Online":"Offline"}</span></div>
  <div class="quick"><button onclick="setPage('purchase')">📥<b>${lang==="or"?"ଚାଉଳ କିଣନ୍ତୁ":"New Purchase"}</b><small>${lang==="or"?"ସପ୍ଲାୟରଠାରୁ":"From supplier"}</small></button><button onclick="setPage('sale')">📤<b>${lang==="or"?"ଚାଉଳ ବିକ୍ରି":"New Sale"}</b><small>${lang==="or"?"ଗ୍ରାହକ / A-Party":"Customer / A-Party"}</small></button><button onclick="setPage('history')">🧾<b>${lang==="or"?"ହିସାବ ତାଲିକା":"Transactions"}</b><small>${lang==="or"?"ସମସ୍ତ ଏଣ୍ଟ୍ରି":"All entries"}</small></button><button onclick="setPage('parties')">👥<b>${lang==="or"?"ପାର୍ଟି":"Party Master"}</b><small>${lang==="or"?"ଗ୍ରାହକ / ସପ୍ଲାୟର":"Customers / Suppliers"}</small></button></div></div>
@@ -142,12 +236,12 @@ function history(){
  let rows=[...purchases.map(x=>({...x,__type:"Purchase"})),...sales.map(x=>({...x,__type:"Sale"}))];
  return `<div class="card"><div class="toolbar"><div class="grow"><h2>${lang==="or"?"ଲେନଦେନ ହିସାବ":"Transaction History"}</h2><small>${rows.length} ${lang==="or"?"ଟି ରେକର୍ଡ":"records"}</small></div><input id="search" oninput="filterHistory()" style="max-width:260px" placeholder="${lang==="or"?"ପାର୍ଟି ଖୋଜନ୍ତୁ":"Search party"}"></div><div class="table-wrap"><table class="data"><thead><tr><th>Date</th><th>Type</th><th>Party</th><th>Rice</th><th>KG</th><th>Rate</th><th>Total</th><th>Paid/Received</th><th>Due</th></tr></thead><tbody id="historyBody">${historyRows(rows)}</tbody></table></div></div>`
 }
-function historyRows(rows){if(!rows.length)return `<tr><td colspan="9" class="empty">No transactions / କୌଣସି ତଥ୍ୟ ନାହିଁ</td></tr>`;return rows.slice().reverse().map(x=>{let type=x.__type||x.Type||"",party=x.partyName||x["Party Name"]||x["Party Name / ପାର୍ଟି ନାମ"]||"",date=x.date||x.Date||"",q=x.qty||x["Qty (KG)"]||x["Quantity (KG)"]||x.Quantity||0,r=x.rate||x["Rate / KG"]||x.Rate||0,t=x.total||x["Total Amount"]||x.Total||x.Amount||0,p=x.paid||x.received||x.Paid||x.Received||0,d=x.due||x.Due||0;return `<tr><td>${esc(fmtDate(date))}</td><td><span class="pill ${type.toLowerCase().includes("sale")?"sell":"buy"}">${esc(type)}</span></td><td>${esc(party)}</td><td>NORMAL RICE</td><td class="num">${qty(q)}</td><td class="num">${money(r)}</td><td class="num">${money(t)}</td><td class="num">${money(p)}</td><td class="num"><span class="pill ${Number(d)>0?"due":"paid"}">${money(d)}</span></td></tr>`}).join("")}
+function historyRows(rows){if(!rows.length)return `<tr><td colspan="9" class="empty">No transactions / କୌଣସି ତଥ୍ୟ ନାହିଁ</td></tr>`;return rows.slice().reverse().map(x=>{let type=x.__type||x.Type||"",party=partyNameOf(x),date=x.date||x.Date||"",q=qtyOf(x),r=rateOf(x),t=totalOf(x),p=paidOf(x),d=dueOf(x);return `<tr><td>${esc(fmtDate(date))}</td><td><span class="pill ${type.toLowerCase().includes("sale")?"sell":"buy"}">${esc(type)}</span></td><td>${esc(party)}</td><td>NORMAL RICE</td><td class="num">${qty(q)}</td><td class="num">${money(r)}</td><td class="num">${money(t)}</td><td class="num">${money(p)}</td><td class="num"><span class="pill ${Number(d)>0?"due":"paid"}">${money(d)}</span></td></tr>`}).join("")}
 function filterHistory(){let q=($("#search").value||"").toLowerCase(),rows=[...purchases.map(x=>({...x,__type:"Purchase"})),...sales.map(x=>({...x,__type:"Sale"}))].filter(x=>String(x.partyName||x["Party Name"]||x["Party Name / ପାର୍ଟି ନାମ"]||"").toLowerCase().includes(q));$("#historyBody").innerHTML=historyRows(rows)}
-function partiesPage(){let map=new Map();[...purchases,...sales].forEach(x=>{let n=x.partyName||x["Party Name"];if(!n)return;let o=map.get(n)||{name:n,kg:0,amt:0,due:0};o.kg+=Number(x.qty||x["Quantity (KG)"]||0);o.amt+=Number(x.total||x.Total||0);o.due+=Number(x.due||x.Due||0);map.set(n,o)});let arr=[...map.values()];return `<div class="card"><div class="toolbar"><div class="grow"><h2>👥 Party Master / ପାର୍ଟି</h2><small>${lang==="or"?"ଲେନଦେନ ଅନୁସାରେ ପାର୍ଟି":"Parties from transactions"}</small></div><button class="btn primary" onclick="toast('Add Party can be connected to PARTY MASTER')">＋ Add Party</button></div><div class="party-grid">${arr.length?arr.map(o=>`<div class="party"><div class="name">${esc(o.name)}</div><div class="meta">${qty(o.kg)} KG transactions</div><div class="amount">${money(o.amt)}</div><div class="meta">${o.due>0?"Due / ବାକି: "+money(o.due):"Paid / ସବୁ ଦିଆସରିଛି"}</div></div>`).join(""):`<div class="empty">No parties / ପାର୍ଟି ତଥ୍ୟ ନାହିଁ</div>`}</div></div>`}
+function partiesPage(){let map=new Map();[...purchases,...sales].forEach(x=>{let n=partyNameOf(x);if(!n)return;let o=map.get(n)||{name:n,kg:0,amt:0,due:0};o.kg+=qtyOf(x);o.amt+=totalOf(x);o.due+=dueOf(x);map.set(n,o)});let arr=[...map.values()];return `<div class="card"><div class="toolbar"><div class="grow"><h2>👥 Party Master / ପାର୍ଟି</h2><small>${lang==="or"?"ଲେନଦେନ ଅନୁସାରେ ପାର୍ଟି":"Parties from transactions"}</small></div><button class="btn primary" onclick="toast('Add Party can be connected to PARTY MASTER')">＋ Add Party</button></div><div class="party-grid">${arr.length?arr.map(o=>`<div class="party"><div class="name">${esc(o.name)}</div><div class="meta">${qty(o.kg)} KG transactions</div><div class="amount">${money(o.amt)}</div><div class="meta">${o.due>0?"Due / ବାକି: "+money(o.due):"Paid / ସବୁ ଦିଆସରିଛି"}</div></div>`).join(""):`<div class="empty">No parties / ପାର୍ଟି ତଥ୍ୟ ନାହିଁ</div>`}</div></div>`}
 function stockPage(){let st=Number(dashboardData.currentStock||0);return `<div class="grid k3"><div class="card kpi blue"><span class="lbl">Opening / ଆରମ୍ଭ</span><span class="val">—</span></div><div class="card kpi green"><span class="lbl">Purchase / କିଣା</span><span class="val">${qty(dashboardData.purchaseQty)} KG</span></div><div class="card kpi orange"><span class="lbl">Sales / ବିକ୍ରି</span><span class="val">${qty(dashboardData.salesQty)} KG</span></div></div><div style="height:12px"></div><div class="card"><h2>📦 Closing Stock / ବାକି ଷ୍ଟକ୍</h2><div style="font-size:2.4rem;font-weight:900;margin-top:10px">${qty(st)} KG</div><small>Normal Rice / ସାଧାରଣ ଚାଉଳ</small></div>`}
 function printPage(){return `<div class="card"><div class="toolbar"><div class="grow"><h2>🖨️ Print Register / ପ୍ରିଣ୍ଟ</h2><small>${lang==="or"?"A4 ପ୍ରିଣ୍ଟ ପାଇଁ":"For A4 printing"}</small></div><button class="btn primary" onclick="window.print()">🖨️ Print</button></div><div class="card" style="background:white;color:#111;margin-top:10px"><h2 style="text-align:center;color:#111">RICE PURCHASE & SALES REGISTER</h2><p style="text-align:center;color:#333">NORMAL RICE / ସାଧାରଣ ଚାଉଳ</p>${printTable()}</div></div>`}
-function printTable(){let rows=[...purchases.map(x=>({...x,__type:"Purchase"})),...sales.map(x=>({...x,__type:"Sale"}))];return `<table class="data" style="min-width:0;color:#111"><thead><tr><th>Date</th><th>Type</th><th>Party</th><th>KG</th><th>Rate</th><th>Total</th><th>Paid</th><th>Due</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(fmtDate(x.date||x.Date||""))}</td><td>${esc(x.__type)}</td><td>${esc(x.partyName||x["Party Name"]||x["Party Name / ପାର୍ଟି ନାମ"]||"")}</td><td>${qty(x.qty||x["Quantity (KG)"]||0)}</td><td>${money(x.rate||x.Rate||0)}</td><td>${money(x.total||x.Total||0)}</td><td>${money(x.paid||x.received||0)}</td><td>${money(x.due||x.Due||0)}</td></tr>`).join("")}</tbody></table>`}
+function printTable(){let rows=[...purchases.map(x=>({...x,__type:"Purchase"})),...sales.map(x=>({...x,__type:"Sale"}))];return `<table class="data" style="min-width:0;color:#111"><thead><tr><th>Date</th><th>Type</th><th>Party</th><th>KG</th><th>Rate</th><th>Total</th><th>Paid</th><th>Due</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(fmtDate(x.date||x.Date||""))}</td><td>${esc(x.__type)}</td><td>${esc(x.partyName||x["Party Name"]||x["Party Name / ପାର୍ଟି ନାମ"]||"")}</td><td>${qty(qtyOf(x))}</td><td>${money(rateOf(x))}</td><td>${money(totalOf(x))}</td><td>${money(paidOf(x))}</td><td>${money(dueOf(x))}</td></tr>`).join("")}</tbody></table>`}
 function settings(){return `<div class="grid k2"><div class="card"><h2>⚙️ Settings / ସେଟିଂ</h2><div style="height:12px"></div><div class="field"><label>Google Apps Script API</label><input value="${API}" readonly></div><div style="height:10px"></div><div class="field"><label>Rice Type / ଚାଉଳ</label><input value="NORMAL RICE / ସାଧାରଣ ଚାଉଳ" readonly></div></div><div class="card"><h2>ℹ️ App</h2><p class="muted">GitHub Pages + Google Sheets</p><p class="muted">All purchase and sales records use one fixed rice type: NORMAL RICE.</p></div></div>`}
 function draw(){activeNav();updateLanguageButton();let titles={dashboard:"Dashboard / ଡ୍ୟାସବୋର୍ଡ",purchase:"Purchase / କିଣା",sale:"Sales / ବିକ୍ରି",history:"History / ହିସାବ",parties:"Parties / ପାର୍ଟି",stock:"Stock / ଷ୍ଟକ୍",print:"Print / ପ୍ରିଣ୍ଟ",settings:"Settings / ସେଟିଂ"};$("#pageTitle").textContent=titles[page];let content=page==="dashboard"?dashboard():page==="purchase"?form("purchase"):page==="sale"?form("sale"):page==="history"?history():page==="parties"?partiesPage():page==="stock"?stockPage():page==="print"?printPage():settings();$("#root").innerHTML=content;if(page==="purchase"||page==="sale")bindCalc()}
 function updateOnline(){let o=navigator.onLine;$("#online").textContent=o?"● Online":"● Offline";$("#online").classList.toggle("on",o)}
