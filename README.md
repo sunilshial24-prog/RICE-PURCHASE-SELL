@@ -1,0 +1,1 @@
+Step 5: transaction history and safe delete. Replace/redeploy Code.gs only if your current backend needs these actions. Edit requires a stable Transaction ID column.
